@@ -1,5 +1,9 @@
-"""Red-target detection for BGR camera images."""
+"""Pure bbox/altitude/attitude to Angle-mode RC guidance; no vision or device IO."""
+from .config import CameraCalibration, NavigatorConfig, Tuning, VehicleConfig
+from .navigator import LosNavigator
+from .types import (AttitudeSample, BarometerSample, Diagnostics, NavigationInput,
+                    NavigationResult, RcChannels, State, TargetObservation, TrackStage)
 
-from .detector import detect_red_box
-
-__all__ = ["detect_red_box"]
+__all__ = ["LosNavigator", "NavigatorConfig", "CameraCalibration", "VehicleConfig", "Tuning",
+           "TargetObservation", "BarometerSample", "AttitudeSample", "NavigationInput",
+           "NavigationResult", "RcChannels", "Diagnostics", "State", "TrackStage"]
