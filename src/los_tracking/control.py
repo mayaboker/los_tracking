@@ -75,7 +75,7 @@ class LosControl:
         self.vertical_memory = self.lateral_memory = 0.0
 
     def step(self, dt, altitude, vz, attitude, heading, *, errors=None, rates=(0.0, 0.0),
-             hold_altitude=None, approach_scale=1.0, freeze_integral=False):
+             hold_altitude=None, approach_scale=1.0, freeze_integral=False, max_climb_m_s=None):
         t, vehicle = self.tuning, self.config.vehicle
         tracking = errors is not None
         old_z, old_r = self.vertical_memory, self.lateral_memory
@@ -92,13 +92,13 @@ class LosControl:
             base_r = 0.0
 
         requested_z = base_z + (candidate_z if tracking else 0.0)
-        limited_z = clamp(requested_z, -t.max_descent_m_s, t.max_climb_m_s)
+        limited_z = clamp(requested_z, -t.max_descent_m_s, t.max_climb_m_s if max_climb_m_s is None else max_climb_m_s)
         new_z = self.vz_reference + clamp(limited_z - self.vz_reference,
                                         -t.vertical_slew_m_s2 * dt, t.vertical_slew_m_s2 * dt)
         if tracking and (candidate_z - old_z) * (requested_z - new_z) > 0:
             candidate_z = old_z
             requested_z = base_z + candidate_z
-            limited_z = clamp(requested_z, -t.max_descent_m_s, t.max_climb_m_s)
+            limited_z = clamp(requested_z, -t.max_descent_m_s, t.max_climb_m_s if max_climb_m_s is None else max_climb_m_s)
             new_z = self.vz_reference + clamp(limited_z - self.vz_reference,
                                             -t.vertical_slew_m_s2 * dt, t.vertical_slew_m_s2 * dt)
 

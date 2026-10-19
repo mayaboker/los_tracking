@@ -7,3 +7,6 @@ from .types import (AttitudeSample, BarometerSample, Diagnostics, NavigationInpu
 __all__ = ["LosNavigator", "NavigatorConfig", "CameraCalibration", "VehicleConfig", "Tuning",
            "TargetObservation", "BarometerSample", "AttitudeSample", "NavigationInput",
            "NavigationResult", "RcChannels", "Diagnostics", "State", "TrackStage"]
+
+from .hold import AltitudeHeadingHold, ControlHandoff
+__all__ += ["AltitudeHeadingHold", "ControlHandoff"]

@@ -29,7 +29,7 @@ class LosNavigator:
     def config(self):
         return self._config
 
-    def reset(self):
+    def reset(self, *, handoff=None):
         t = self.config.tuning
         self.state = State.DISABLED
         self.stage = TrackStage.BEARING
@@ -55,6 +55,13 @@ class LosNavigator:
         self._descent_feasible = None
         self._input_rejection = ""
         self._reason = "disabled"
+        if handoff is not None:
+            from .hold import restore_handoff
+            self._vertical, self._attitudes, self._control = restore_handoff(handoff, self.config)
+            self._last_samples = dict(attitude=handoff.attitudes[-1], barometer=handoff.barometer)
+            self._heading, self._hold_altitude = handoff.heading_rad, handoff.hold_altitude_m
+            self._last_now = handoff.timestamp_s
+            self._sensors_were_ready = True
 
     def _validate_tick(self, inputs, now, enabled):
         if not isinstance(inputs, NavigationInput) or type(enabled) is not bool:
@@ -235,7 +242,8 @@ class LosNavigator:
         if self.state == State.DISABLED:
             self.state = State.ACQUIRE
             self._started_at = now
-            previous_time = None
+            if not self._sensors_were_ready:
+                previous_time = None
         dt = 0.0 if previous_time is None else now - previous_time
         if dt > self.config.tuning.max_control_gap_s + TIME_EPSILON:
             self._fault("control_gap")

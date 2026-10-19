@@ -186,3 +186,20 @@ source revision `6cce117761b84c78c068185f291527dbb00c5481`. This implementation 
 the original-LOS contact behavior but adds altitude-history vertical estimation,
 explicit RC conversion, combined tilt enforcement, sample identity checks and
 qualified reciprocal-size TTC. See [implementation plan](docs/implementation-plan.md).
+
+## Altitude/heading hold and handoff
+
+`AltitudeHeadingHold(config, max_climb_m_s=1.0)` shares the LOS vertical estimator,
+bounded attitude history and control law. Feed timestamped `NavigationInput`
+sensors through `observe()`, check `ready(now_s)`, then call
+`command(now_s=..., target_altitude_m=...)`. It produces four AETR channels;
+the caller owns arming, mode, transport and all other channels. It consumes no XY
+position or velocity. `estimate(now_s)` reports filtered altitude/vertical speed.
+
+After hold, use `navigator.reset(handoff=hold.handoff(now_s=...,
+target_altitude_m=...))`, then advance at a strictly later monotonic time.
+`ControlHandoff` is an immutable, validated snapshot tied to the same navigator
+profile. It preserves filtered vertical state, recent attitude samples, heading,
+hold target, reference roll/pitch/vertical speed and thrust integral. The new
+navigator still requires its normal fresh visual acquisition dwell; handoff does
+not authorize arming or bypass stale-sensor checks. Plain `reset()` is unchanged.
