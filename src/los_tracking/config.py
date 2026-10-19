@@ -104,7 +104,7 @@ class Tuning:
     recovery_timeout_s: float = 1.0
     limitation_timeout_s: float = 0.75
     max_elevation_rad: float = 60 * DEG_TO_RAD
-    max_azimuth_rad: float = 30 * DEG_TO_RAD
+    max_azimuth_rad: float = 35 * DEG_TO_RAD
     max_los_deviation_rad: float = 12 * DEG_TO_RAD
     max_association_jump_rad: float = 12 * DEG_TO_RAD
     ttc_window_s: float = 0.5

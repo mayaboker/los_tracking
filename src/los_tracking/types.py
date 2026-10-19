@@ -162,6 +162,10 @@ class Diagnostics:
     thrust_saturated: bool = False
     vertical_memory_m_s: float = 0.0
     lateral_memory_rad: float = 0.0
+    rejected_elevation_rad: float | None = None
+    rejected_azimuth_rad: float | None = None
+    max_elevation_rad: float | None = None
+    max_azimuth_rad: float | None = None
 
 
 @dataclass(frozen=True)

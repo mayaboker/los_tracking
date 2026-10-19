@@ -203,3 +203,18 @@ profile. It preserves filtered vertical state, recent attitude samples, heading,
 hold target, reference roll/pitch/vertical speed and thrust integral. The new
 navigator still requires its normal fresh visual acquisition dwell; handoff does
 not authorize arming or bypass stale-sensor checks. Plain `reset()` is unchanged.
+
+## Bearing envelope diagnostics
+
+Default azimuth acceptance is ±35 degrees (`max_azimuth_rad`); elevation remains
+±60 degrees. The Bullet example profile uses the same limits. A tiny numerical
+tolerance preserves inclusive boundary acceptance. Other control limits and
+acquisition timeout behavior remain unchanged.
+
+`Diagnostics.rejected_azimuth_rad` / `rejected_elevation_rad` retain the latest
+out-of-envelope observation while that rejection is current, alongside
+`max_azimuth_rad` / `max_elevation_rad`. These are unfiltered rejected inputs,
+separate from valid bearing estimates. They are cleared on a usable observation,
+a different visual rejection or reset. Timeout diagnostics retain the rejection
+cause so applications can explain the failed acquisition. A stale last accepted
+sample does not overwrite a newer rejection with a generic stale-image cause.

@@ -260,3 +260,62 @@ def test_exact_sensor_age_boundary_expires_command_without_early_fault(config):
     assert not boundary.usable and boundary.valid_until_s == pytest.approx(0.4)
     fresh = nav.update(samples(41), now_s=0.41, enabled=True)
     assert fresh.state == State.TRACK and fresh.usable
+
+
+@pytest.mark.parametrize('azimuth_deg', [-35, -32, 32, 35])
+def test_default_azimuth_envelope_accepts_through_35_degrees(config, azimuth_deg):
+    from math import tan
+    assert config.tuning.max_azimuth_rad == pytest.approx(radians(35))
+    camera = config.camera
+    box = (camera.cx_px - camera.fx_px * tan(radians(azimuth_deg)) - 5, camera.cy_px - 5, 10, 10)
+    result = acquire(LosNavigator(config), bbox=box)
+    assert result.state == State.TRACK
+    assert result.diagnostics.bearing_valid
+    assert result.diagnostics.azimuth_rad == pytest.approx(radians(azimuth_deg))
+    assert result.diagnostics.rejected_azimuth_rad is None
+
+
+@pytest.mark.parametrize('azimuth_deg', [-35.01, 35.01])
+def test_rejected_bearing_diagnostics_preserve_cause_through_timeout(config, azimuth_deg):
+    from math import tan
+    camera = config.camera
+    box = (camera.cx_px - camera.fx_px * tan(radians(azimuth_deg)) - 5, camera.cy_px - 5, 10, 10)
+    nav = LosNavigator(config)
+    for index in range(501):
+        result = nav.update(samples(index, bbox=box), now_s=index * .01, enabled=True)
+    assert result.state == State.FAULT and result.reason == 'acquisition_timeout'
+    d = result.diagnostics
+    assert d.vision_reason == 'bearing_outside_envelope'
+    assert d.rejected_azimuth_rad == pytest.approx(radians(azimuth_deg))
+    assert d.max_azimuth_rad == pytest.approx(radians(35))
+    assert not d.bearing_valid and d.azimuth_rad is None
+    nav.reset()
+    result = acquire(nav)
+    assert result.state == State.TRACK and result.diagnostics.rejected_azimuth_rad is None
+
+
+def test_fresh_envelope_rejection_is_not_hidden_by_stale_previous_good_bearing(config):
+    from math import tan
+    nav = LosNavigator(config)
+    acquire(nav)
+    box = (config.camera.cx_px - config.camera.fx_px * tan(radians(36)) - 5,
+           config.camera.cy_px - 5, 10, 10)
+    for index in range(35, 141):
+        result = nav.update(samples(index, bbox=box), now_s=index * .01, enabled=True)
+    assert result.state == State.FAULT and result.reason == 'recovery_timeout'
+    assert result.diagnostics.vision_reason == 'bearing_outside_envelope'
+    assert result.diagnostics.rejected_azimuth_rad == pytest.approx(radians(36))
+
+
+def test_rejection_context_clears_when_visual_cause_changes_or_target_becomes_usable(config):
+    from math import tan
+    nav = LosNavigator(config)
+    box = (config.camera.cx_px - config.camera.fx_px * tan(radians(36)) - 5,
+           config.camera.cy_px - 5, 10, 10)
+    result = acquire(nav, bbox=box)
+    assert result.diagnostics.rejected_azimuth_rad is not None
+    result = nav.update(samples(35, bbox=None), now_s=.35, enabled=True)
+    assert result.diagnostics.vision_reason == 'no_target'
+    assert result.diagnostics.rejected_azimuth_rad is None
+    result = acquire(nav, start=36)
+    assert result.state == State.TRACK and result.diagnostics.rejected_azimuth_rad is None

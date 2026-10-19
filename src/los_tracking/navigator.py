@@ -10,6 +10,7 @@ from .types import Diagnostics, NavigationInput, NavigationResult, State, TrackS
 
 MIN_ACQUISITION_FRAMES = 3
 TIME_EPSILON = 1e-9
+BEARING_EPSILON_RAD = 1e-12
 
 
 class LosNavigator:
@@ -47,6 +48,7 @@ class LosNavigator:
         self._sensors_were_ready = False
         self._visual_usable = False
         self._vision_reason = "not_observed"
+        self._rejected_bearing = None
         self._last_visual_time = None
         self._candidate_start = self._candidate_end = None
         self._candidate_reference = None
@@ -112,6 +114,8 @@ class LosNavigator:
         self._candidate_reference = None
 
     def _reject_visual(self, reason):
+        if reason != "bearing_outside_envelope":
+            self._rejected_bearing = None
         self._visual_usable = False
         self._vision_reason = reason
         self._clear_candidate()
@@ -147,7 +151,8 @@ class LosNavigator:
         if not all(isfinite(v) for v in angles):
             self._reject_visual("invalid_geometry")
             return
-        if abs(angles[0]) > t.max_elevation_rad or abs(angles[1]) > t.max_azimuth_rad:
+        if abs(angles[0]) > t.max_elevation_rad + BEARING_EPSILON_RAD or abs(angles[1]) > t.max_azimuth_rad + BEARING_EPSILON_RAD:
+            self._rejected_bearing = angles
             self._reject_visual("bearing_outside_envelope")
             return
         if self._reference is not None and hypot(*(wrap(a - b) for a, b in zip(angles, self._reference))) > t.max_los_deviation_rad:
@@ -167,6 +172,7 @@ class LosNavigator:
         self._last_visual_time = sample.timestamp_s
         self._visual_usable = True
         self._vision_reason = "usable"
+        self._rejected_bearing = None
 
     def _recover(self, now, altitude, reason):
         if self.state != State.RECOVER:
@@ -286,7 +292,7 @@ class LosNavigator:
             self._hold_altitude = altitude
         self._process_target(now)
         if self._last_visual_time is None or now - self._last_visual_time > t.max_image_age_s + TIME_EPSILON:
-            self._reject_visual("stale_image" if self._last_visual_time is not None else self._vision_reason)
+            self._reject_visual("stale_image" if self._visual_usable else self._vision_reason)
         measured_roll, measured_pitch, _ = euler(attitude.orientation_xyzw)
         over_tilt = combined_tilt(measured_roll, measured_pitch) > t.combined_tilt_limit_rad + TIME_EPSILON
         if over_tilt:
@@ -364,6 +370,9 @@ class LosNavigator:
             attitude_age_s=now - attitude.timestamp_s if attitude else None,
             barometer_age_s=now - barometer.timestamp_s if barometer else None,
             vision_reason=self._vision_reason, input_rejection=self._input_rejection,
+            rejected_elevation_rad=self._rejected_bearing[0] if self._rejected_bearing else None,
+            rejected_azimuth_rad=self._rejected_bearing[1] if self._rejected_bearing else None,
+            max_elevation_rad=t.max_elevation_rad, max_azimuth_rad=t.max_azimuth_rad,
             **self._control.last_diagnostics)
         expiry = now
         if command is not None:
