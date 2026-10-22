@@ -218,3 +218,12 @@ separate from valid bearing estimates. They are cleared on a usable observation,
 a different visual rejection or reset. Timeout diagnostics retain the rejection
 cause so applications can explain the failed acquisition. A stale last accepted
 sample does not overwrite a newer rejection with a generic stale-image cause.
+
+For caller-owned target search, `hold.command(..., yaw_rate_rad_s=...)` replaces
+heading feedback with an explicit bounded yaw rate while preserving altitude
+control. Omitting the keyword restores heading hold. `hold.set_heading(rad)`
+changes the hold/handoff heading without resetting filters or thrust integral;
+it validates and wraps the supplied angle. `hold.attitude_at(timestamp_s)`
+provides interpolation from bounded history with no extrapolation. Overrides
+are validated before controller state changes and cannot exceed the profile's
+yaw-rate limit.

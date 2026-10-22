@@ -2,7 +2,7 @@
 from math import acos, cos, isfinite
 
 from .geometry import clamp, combined_tilt, euler, wrap
-from .types import RcChannels
+from .types import RcChannels, finite
 
 
 RC_CENTRE = 1500
@@ -75,8 +75,12 @@ class LosControl:
         self.vertical_memory = self.lateral_memory = 0.0
 
     def step(self, dt, altitude, vz, attitude, heading, *, errors=None, rates=(0.0, 0.0),
-             hold_altitude=None, approach_scale=1.0, freeze_integral=False, max_climb_m_s=None):
+             hold_altitude=None, approach_scale=1.0, freeze_integral=False, max_climb_m_s=None, yaw_rate_rad_s=None):
         t, vehicle = self.tuning, self.config.vehicle
+        if yaw_rate_rad_s is not None:
+            finite(yaw_rate_rad_s, 'yaw_rate_rad_s')
+            if abs(yaw_rate_rad_s) > t.yaw_rate_limit_rad_s:
+                raise ValueError('yaw rate exceeds configured limit')
         tracking = errors is not None
         old_z, old_r = self.vertical_memory, self.lateral_memory
         if tracking:
@@ -137,6 +141,8 @@ class LosControl:
             thrust = clamp(raw_thrust, 0.0, vehicle.max_thrust_n)
         yaw_rate = clamp(t.yaw_gain_s_inv * wrap(heading - measured_yaw),
                          -t.yaw_rate_limit_rad_s, t.yaw_rate_limit_rad_s)
+        if yaw_rate_rad_s is not None:
+            yaw_rate = yaw_rate_rad_s
         command, output_angles = encode_channels(*new_angles, thrust, yaw_rate, self.config)
         self.vertical_memory, self.lateral_memory = candidate_z, candidate_r
         self.thrust_integral = candidate_thrust_i

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from .config import NavigatorConfig
 from .control import LosControl
 from .estimation import VerticalEstimator
-from .geometry import AttitudeHistory, combined_tilt, euler
+from .geometry import AttitudeHistory, combined_tilt, euler, wrap
 from .types import AttitudeSample, BarometerSample, NavigationInput, finite
 
 
@@ -107,7 +107,19 @@ class AltitudeHeadingHold:
     def estimate(self, now_s):
         return self.vertical.at(now_s)
 
-    def command(self, *, now_s, target_altitude_m):
+    def set_heading(self, heading_rad):
+        """Select a hold/handoff heading without resetting filters or integrals."""
+        self.heading_rad = wrap(finite(heading_rad, 'heading_rad'))
+
+    def attitude_at(self, timestamp_s):
+        """Aligned attitude at exposure time; never extrapolate."""
+        return self.history.at(finite(timestamp_s, 'timestamp_s'))
+
+    def command(self, *, now_s, target_altitude_m, yaw_rate_rad_s=None):
+        if yaw_rate_rad_s is not None:
+            finite(yaw_rate_rad_s, 'yaw_rate_rad_s')
+            if abs(yaw_rate_rad_s) > self.config.tuning.yaw_rate_limit_rad_s:
+                raise ValueError('yaw rate exceeds configured limit')
         if not self.ready(now_s):
             raise ValueError('hold sensors not ready')
         dt = 0.0 if self.last_now is None else now_s - self.last_now
@@ -116,7 +128,7 @@ class AltitudeHeadingHold:
         self.last_now = now_s
         altitude, vz = self.estimate(now_s)
         return self.control.step(dt, altitude, vz, self.attitude.orientation_xyzw, self.heading_rad,
-                                 hold_altitude=target_altitude_m, max_climb_m_s=self.max_climb_m_s)
+                                 hold_altitude=target_altitude_m, max_climb_m_s=self.max_climb_m_s, yaw_rate_rad_s=yaw_rate_rad_s)
 
     def handoff(self, *, now_s, target_altitude_m):
         if not self.ready(now_s):
