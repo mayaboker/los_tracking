@@ -2,7 +2,9 @@
 
 The pipeline is **physics state → Godot camera rendering → shared-memory image
 → OpenCV detector → bbox**. Position and attitude travel together in one pose
-message.
+message. Ground truth is the default; the physics YAML can select barometer render
+altitude and complementary-filter IMU attitude for rendering and app feedback.
+See [sensor pose configuration](../../bullet_drone/docs/design/sensors.md#sensor-pose-selection-and-attitude-estimation).
 
 ```mermaid
 flowchart TD
@@ -31,6 +33,12 @@ The same source stamp is reused in feedback and the pose selected for rendering.
 See [the external-RC runner](../../bullet_drone/examples/external_rc/main.py).
 
 ## 2. Physics schedules a camera capture
+
+Before publication, the selected pose keeps true X/Y and velocity, optionally
+replaces Z with the barometer altitude, and optionally uses the IMU attitude
+estimate computed on that physics step. Sensor noise is applied in physics only.
+The selected values retain the original observation identity and timestamps.
+Stopped publication reuses the cached pose without new samples or filter updates.
 
 The current camera configuration is **640 × 480 pixels, 90° horizontal FOV,
 30 FPS**. With physics running at 240 Hz, this normally schedules one capture

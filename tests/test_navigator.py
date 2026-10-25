@@ -319,3 +319,38 @@ def test_rejection_context_clears_when_visual_cause_changes_or_target_becomes_us
     assert result.diagnostics.rejected_azimuth_rad is None
     result = acquire(nav, start=36)
     assert result.state == State.TRACK and result.diagnostics.rejected_azimuth_rad is None
+
+
+def test_image_deadline_recovers_before_next_command_can_expire(config):
+    nav = LosNavigator(config)
+    acquire(nav)
+    # The image is still fresh, but its deadline cannot cover the caller's next tick and delivery.
+    result = nav.update(samples(43, camera=False), now_s=0.43, enabled=True, command_horizon_s=0.02)
+    assert result.state == State.RECOVER and result.usable
+    assert result.reason == 'image_deadline'
+    assert result.valid_until_s >= 0.45
+
+
+@pytest.mark.parametrize('horizon', [-0.01, float('nan'), float('inf')])
+def test_invalid_command_horizon_is_rejected_before_mutation(config, horizon):
+    nav = LosNavigator(config)
+    with pytest.raises(ValueError):
+        nav.update(samples(0), now_s=0.0, enabled=True, command_horizon_s=horizon)
+    assert nav.state == State.DISABLED
+
+
+@pytest.mark.parametrize('bbox,edges', [((0,100,20,20),('left',)),((100,0,20,20),('top',)),
+                                      ((620,100,20,20),('right',)),((100,460,20,20),('bottom',)),
+                                      ((310,280,20,20),())])
+def test_processed_image_identity_and_edge_margins(config,bbox,edges):
+    nav=LosNavigator(config)
+    acquire(nav)
+    result=nav.update(samples(35,bbox=bbox),now_s=.35,enabled=True)
+    d=result.diagnostics
+    assert d.processed_image_sequence==35 and d.processed_image_stream_id=='camera'
+    assert d.processed_image_timestamp_s==pytest.approx(.35)
+    assert d.processed_bbox==bbox and d.touched_edges==edges
+    x,y,w,h=bbox
+    assert d.edge_margins_px==(x,y,640-x-w,480-y-h)
+    if edges:
+        assert d.vision_reason=='clipped_target' and result.state==State.RECOVER

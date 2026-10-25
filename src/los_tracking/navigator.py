@@ -44,6 +44,7 @@ class LosNavigator:
         self._ttc = TtcEstimator(t)
         self._control = LosControl(self.config)
         self._pending_target = None
+        self._processed_target = None
         self._heading = self._reference = self._hold_altitude = None
         self._sensors_were_ready = False
         self._visual_usable = False
@@ -125,6 +126,7 @@ class LosNavigator:
         sample = self._pending_target
         if sample is None:
             return
+        self._processed_target = sample
         t = self.config.tuning
         if now - sample.timestamp_s > t.max_image_age_s + TIME_EPSILON:
             self._pending_target = None
@@ -223,12 +225,17 @@ class LosNavigator:
         elif self.stage == TrackStage.BEARING:
             self._ttc_entry_at = None
 
-    def update(self, inputs: NavigationInput, *, now_s: float, enabled: bool) -> NavigationResult:
+    def update(self, inputs: NavigationInput, *, now_s: float, enabled: bool,
+               command_horizon_s: float = 0.0) -> NavigationResult:
         """Advance once; invalid shapes/clocks raise ValueError before state mutation.
 
         Missing/stale operational data return state-bearing results. All samples
         use measurement time in the same clock domain as now_s, never arrival time.
+        command_horizon_s reserves image validity for caller scheduling and delivery.
         """
+        finite(command_horizon_s, "command_horizon_s")
+        if command_horizon_s < 0:
+            raise ValueError("command_horizon_s must be nonnegative")
         self._validate_tick(inputs, now_s, enabled)
         now = float(now_s)
         previous_time = self._last_now
@@ -293,6 +300,10 @@ class LosNavigator:
         self._process_target(now)
         if self._last_visual_time is None or now - self._last_visual_time > t.max_image_age_s + TIME_EPSILON:
             self._reject_visual("stale_image" if self._visual_usable else self._vision_reason)
+        elif (command_horizon_s > 0 and self._visual_usable
+              and self._last_visual_time + t.max_image_age_s - now <= command_horizon_s + TIME_EPSILON):
+            # Recover before an image-limited command can expire between caller ticks.
+            self._reject_visual("image_deadline")
         measured_roll, measured_pitch, _ = euler(attitude.orientation_xyzw)
         over_tilt = combined_tilt(measured_roll, measured_pitch) > t.combined_tilt_limit_rad + TIME_EPSILON
         if over_tilt:
@@ -354,7 +365,15 @@ class LosNavigator:
         vertical = self._vertical.at(now) if self._vertical.time is not None else (None, None)
         bearing_valid = (self._visual_usable and self._last_visual_time is not None
                          and now - self._last_visual_time <= t.max_image_age_s + TIME_EPSILON)
+        from .geometry import box_edges
+        image = self._processed_target
+        margins, edges = box_edges(image.bbox, self.config.camera) if image is not None and image.bbox is not None else (None, ())
         diagnostics = Diagnostics(
+            processed_image_stream_id=None if image is None else image.stream_id,
+            processed_image_sequence=None if image is None else image.sequence,
+            processed_image_timestamp_s=None if image is None else image.timestamp_s,
+            processed_bbox=None if image is None else image.bbox,
+            edge_margins_px=margins, touched_edges=edges,
             elevation_rad=angles[0], azimuth_rad=angles[1],
             elevation_rate_rad_s=self._bearing.rates[0] if self._bearing.count >= 2 else None,
             azimuth_rate_rad_s=self._bearing.rates[1] if self._bearing.count >= 2 else None,

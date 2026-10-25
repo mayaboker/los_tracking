@@ -48,13 +48,29 @@ thrust and yaw rate into four integer RC channels in the range **1000–2000**.
 
 ### Visual guide: what the controller is trying to do
 
-![LOS approach concept: preserve bearing and observe bbox growth](assets/los-approach-idea.svg)
+```mermaid
+flowchart TD
+    REF["Acquire and save world LOS bearing"] --> ERR["Compare current bearing with reference"]
+    OBS["BBox centre + image-time attitude"] --> ERR
+    ERR --> AZ["Azimuth error and rate: correct roll"]
+    ERR --> EL["Elevation error and rate: correct vertical motion"]
+    HEAD["Saved heading: yaw hold"] --> CMD["Bounded RC commands with expiry"]
+    AZ --> CMD
+    EL --> CMD
+    GROW["BBox growth history"] --> TTC["Qualified optical TTC"]
+    TTC --> SUP["Descent feasibility and control-authority checks"]
+    BAR["Altitude, vertical speed and control limits"] --> SUP
+    SUP --> PITCH["Forward pitch scaled down if limited"]
+    PITCH --> CMD
+    SUP --> REC["Persistent limitation: recover and hold altitude"]
+    REC --> CMD
+```
 
-The side view shows one idealized approach with a constant world LOS direction.
-Actual corrections depend on bearing error, LOS rate and available control
-authority. The camera sketches illustrate a fixed target growing in apparent
-size; real TTC requires a qualified history of observations, not three isolated
-images. The package measures bearing after compensating for image-time attitude.
+The objective is to preserve the acquired world LOS direction during approach.
+Bearing error and rate generate corrections; bbox growth supplies qualified TTC
+for supervision. Actual response depends on control authority and command limits.
+TTC requires a qualified history, does not establish collision, and does not
+directly set throttle. Bearing uses attitude aligned to image measurement time.
 
 ### Signal paths: which measurement affects which RC channel?
 
@@ -133,6 +149,7 @@ def update(
     *,
     now_s: float,
     enabled: bool,
+    command_horizon_s: float = 0.0,
 ) -> NavigationResult:
     ...
 ```
@@ -141,6 +158,13 @@ The caller creates one navigator per navigation session and calls this method
 on its control tick. The current app calls it at 100 Hz during LOS acquisition
 and approach. The package owns state between calls, but creates no execution
 loop, thread, socket, detector or simulator.
+
+`command_horizon_s` is the caller's minimum remaining image-validity budget.
+The Bullet app supplies 20 ms (two 100 Hz ticks, including delivery margin).
+When an otherwise usable image cannot cover that horizon, navigation holds in
+ACQUIRE or enters RECOVER with `image_deadline`, before image-limited RC expires.
+The default zero preserves deadline-at-expiry behavior for other callers.
+Image freshness and command expiry limits are not extended.
 
 ```python
 from los_tracking import (
