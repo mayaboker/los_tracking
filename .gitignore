@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Generated development and recording artifacts.
+*.py[cod]
+recordings/
+*.mcap
+*.mcap.partial
+*.mcap.flightlens.sqlite
+*.mcap.flightlens.sqlite-*
