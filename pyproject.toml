@@ -17,4 +17,4 @@ dev = ["pytest>=9,<10", "bullet-drone"]
 testpaths = ["tests"]
 
 [tool.uv.sources]
-bullet-drone = { workspace = true }
+bullet-drone = { path = "../bullet_drone", editable = true }
