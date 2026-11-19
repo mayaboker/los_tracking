@@ -147,6 +147,8 @@ class Diagnostics:
     attitude_age_s: float | None = None
     vision_reason: str = "not_observed"
     input_rejection: str = ""
+    alignment_waits: int = 0
+    alignment_replacements: int = 0
     processed_image_stream_id: str | None = None
     processed_image_sequence: int | None = None
     processed_image_timestamp_s: float | None = None

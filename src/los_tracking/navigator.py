@@ -55,6 +55,9 @@ class LosNavigator:
         self._ttc = TtcEstimator(t)
         self._control = LosControl(self.config)
         self._pending_target = None
+        self._pending_waiting_for_attitude = False
+        self._alignment_waits = 0
+        self._alignment_replacements = 0
         self._processed_target = None
         self._heading = self._reference = self._track_reference = self._hold_altitude = None
         self._sensors_were_ready = False
@@ -138,6 +141,8 @@ class LosNavigator:
         sample = self._pending_target
         if sample is None:
             return
+        was_waiting_for_attitude = self._pending_waiting_for_attitude
+        self._pending_waiting_for_attitude = False
         previous_processed = self._processed_target
         self._processed_target = sample
         t = self.config.tuning
@@ -162,6 +167,9 @@ class LosNavigator:
                 # accepted observation; update() enforces its original expiry.
                 self._processed_target = previous_processed
                 self._vision_reason = "attitude_unaligned"
+                self._pending_waiting_for_attitude = True
+                if not was_waiting_for_attitude:
+                    self._alignment_waits += 1
                 return
             self._reject_visual("attitude_unaligned")
             return
@@ -250,6 +258,7 @@ class LosNavigator:
         self.state = State.COMMIT
         self._reason = "close_target_commit"
         self._pending_target = None
+        self._pending_waiting_for_attitude = False
         self._clear_candidate()
 
     def _stage_and_feasibility(self, now, altitude, vz):
@@ -317,6 +326,9 @@ class LosNavigator:
             except ArithmeticError:
                 self._fault("vertical_numeric_failure")
         if self.state != State.COMMIT and self._accept("target", inputs.target):
+            if self._pending_waiting_for_attitude:
+                self._alignment_replacements += 1
+                self._pending_waiting_for_attitude = False
             self._pending_target = inputs.target
         if self.state == State.FAULT:
             return self._result(now)
@@ -450,6 +462,8 @@ class LosNavigator:
             attitude_age_s=now - attitude.timestamp_s if attitude else None,
             barometer_age_s=now - barometer.timestamp_s if barometer else None,
             vision_reason=self._vision_reason, input_rejection=self._input_rejection,
+            alignment_waits=self._alignment_waits,
+            alignment_replacements=self._alignment_replacements,
             rejected_elevation_rad=self._rejected_bearing[0] if self._rejected_bearing else None,
             rejected_azimuth_rad=self._rejected_bearing[1] if self._rejected_bearing else None,
             max_elevation_rad=t.max_elevation_rad, max_azimuth_rad=t.max_azimuth_rad,

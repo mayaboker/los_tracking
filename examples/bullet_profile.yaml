@@ -118,7 +118,7 @@ tuning:
   # Bearing filter time constant in s. Usage: raise to smooth noisier detections.
   bearing_filter_s: 0.15
   # Maximum accepted image age in s. Usage: keep below control responsiveness needs.
-  max_image_age_s: 0.1
+  max_image_age_s: 0.2
   # Maximum accepted attitude age in s. Usage: match attitude publication latency.
   max_attitude_age_s: 0.2
   # Maximum accepted barometer age in s. Usage: match altitude publication latency.

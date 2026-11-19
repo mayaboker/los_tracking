@@ -55,7 +55,8 @@ def test_profile_rejects_unknown_fields_and_missing_platform_values(tmp_path):
 def test_simulation_profile_matches_actual_rc_platform(config):
     profile = NavigatorConfig.from_yaml(Path(__file__).parents[1] / "examples/bullet_profile.yaml")
     expected = replace(config, tuning=replace(config.tuning, max_attitude_age_s=0.2,
-                                               max_alignment_gap_s=0.12))
+                                               max_alignment_gap_s=0.12,
+                                               max_image_age_s=0.2))
     assert profile.camera == expected.camera and profile.vehicle == expected.vehicle
     for item in fields(Tuning):
         assert getattr(profile.tuning, item.name) == pytest.approx(getattr(expected.tuning, item.name))
