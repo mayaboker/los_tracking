@@ -32,6 +32,7 @@ YAML_DEGREE_FIELDS = {
     "pitch_slew_deg_s": ("pitch_slew_rad_s", DEG_TO_RAD),
     "yaw_rate_limit_deg_s": ("yaw_rate_limit_rad_s", DEG_TO_RAD),
     "track_elevation_deg": ("track_elevation_rad", DEG_TO_RAD),
+    "los_floor_taper_deg": ("los_floor_taper_rad", DEG_TO_RAD),
     "elevation_kp_m_s_deg": ("elevation_kp_m_s_rad", 1 / DEG_TO_RAD),
     "elevation_kd_m_deg": ("elevation_kd_m_rad", 1 / DEG_TO_RAD),
     "elevation_ki_m_s2_deg": ("elevation_ki_m_s2_rad", 1 / DEG_TO_RAD),
@@ -145,6 +146,15 @@ class Tuning:
     track_elevation_rad: float = 0.0
     max_descent_m_s: float = 5.5
     max_climb_m_s: float = 3.0
+    los_entry_descent_m_s: float = 0.0
+    los_min_track_descent_m_s: float = 0.0
+    los_floor_taper_rad: float = 0.0
+    los_brake_accel_m_s2: float = 0.0
+    los_brake_delay_s: float = 0.0
+    los_bottom_guard_fraction: float = 0.0
+    los_bottom_boost_m_s: float = 0.0
+    approach_ttc_taper_start_s: float = 0.0
+    approach_ttc_taper_end_s: float = 0.0
     vertical_slew_m_s2: float = 1.0
     vertical_brake_slew_m_s2: float = 4.0
     takeoff_kp_s_inv: float = 1.0
@@ -206,6 +216,10 @@ class Tuning:
                        "vertical_ki_n_m", "yaw_gain_s_inv", "ttc_time_margin_s",
                        "feasibility_height_margin_m", "commit_edge_margin_px",
                        "track_elevation_rad",
+                       "los_entry_descent_m_s", "los_min_track_descent_m_s",
+                       "los_floor_taper_rad", "los_brake_accel_m_s2", "los_brake_delay_s",
+                       "los_bottom_guard_fraction", "los_bottom_boost_m_s",
+                       "approach_ttc_taper_start_s", "approach_ttc_taper_end_s",
                        "takeoff_kp_s_inv", "takeoff_ki_s2_inv",
                        "betaflight_takeoff_pwm", "betaflight_hover_pwm"}
         for item in fields(self):
@@ -220,6 +234,17 @@ class Tuning:
             raise ValueError("approach pitch exceeds an angular limit")
         if self.takeoff_max_climb_m_s > self.max_climb_m_s:
             raise ValueError("takeoff climb exceeds maximum climb")
+        if self.los_entry_descent_m_s > self.max_descent_m_s:
+            raise ValueError("LOS entry descent exceeds maximum descent")
+        if self.los_min_track_descent_m_s > self.max_descent_m_s:
+            raise ValueError("LOS minimum tracking descent exceeds maximum descent")
+        if self.los_bottom_guard_fraction >= 1:
+            raise ValueError("LOS bottom guard fraction must be below one")
+        if self.los_min_track_descent_m_s + self.los_bottom_boost_m_s > self.max_descent_m_s:
+            raise ValueError("LOS descent floor and bottom boost exceed maximum descent")
+        taper_start, taper_end = self.approach_ttc_taper_start_s, self.approach_ttc_taper_end_s
+        if (taper_start == 0) != (taper_end == 0) or (taper_start > 0 and taper_start <= taper_end):
+            raise ValueError("TTC pitch taper requires start > end > 0, or both zero")
         if not 0 < self.barometer_alpha <= 1 or not 0 < self.barometer_beta <= 1:
             raise ValueError("barometer filter gains must lie in (0,1]")
         if not 0 < self.commit_coverage_fraction <= 1:

@@ -156,7 +156,11 @@ class Diagnostics:
     edge_margins_px: tuple[float, float, float, float] | None = None
     touched_edges: tuple[str, ...] = ()
     requested_vertical_speed_m_s: float = 0.0
+    descent_floor_m_s: float = 0.0
+    bottom_edge_boost_m_s: float = 0.0
+    descent_speed_cap_m_s: float | None = None
     vertical_reference_m_s: float = 0.0
+    approach_pitch_scale: float = 0.0
     requested_roll_rad: float = 0.0
     reference_roll_rad: float = 0.0
     reference_pitch_rad: float = 0.0

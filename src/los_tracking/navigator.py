@@ -1,5 +1,5 @@
 """Caller-owned airborne acquire/approach/recover lifecycle; no transports or devices."""
-from math import hypot, isfinite
+from math import hypot, isfinite, sqrt
 
 from .config import NavigatorConfig, live_config
 from .control import LosControl
@@ -11,6 +11,36 @@ from .types import Diagnostics, NavigationInput, NavigationResult, State, TrackS
 MIN_ACQUISITION_FRAMES = 3
 TIME_EPSILON = 1e-9
 BEARING_EPSILON_RAD = 1e-12
+
+
+def tracking_descent_floor(elevation_error, tuning):
+    if elevation_error <= 0:
+        return 0.0
+    fraction = (min(1.0, elevation_error / tuning.los_floor_taper_rad)
+                if tuning.los_floor_taper_rad > 0 else 1.0)
+    return tuning.los_min_track_descent_m_s * fraction
+
+
+def bottom_edge_descent_boost(bottom_margin_px, image_height_px, tuning):
+    guard_px = tuning.los_bottom_guard_fraction * image_height_px
+    if guard_px <= 0:
+        return 0.0
+    return tuning.los_bottom_boost_m_s * max(0.0, min(1.0, 1 - bottom_margin_px / guard_px))
+
+
+def braking_speed_cap(altitude, vertical_speed, target_altitude, tuning):
+    if tuning.los_brake_accel_m_s2 == 0:
+        return None
+    height = max(0.0, altitude - target_altitude)
+    delayed_height = max(0.0, height - max(0.0, -vertical_speed) * tuning.los_brake_delay_s)
+    return min(tuning.max_descent_m_s, sqrt(2 * tuning.los_brake_accel_m_s2 * delayed_height))
+
+
+def ttc_pitch_scale(tau, tuning):
+    if tau is None or tuning.approach_ttc_taper_start_s == 0:
+        return 1.0
+    return max(0.0, min(1.0, (tau - tuning.approach_ttc_taper_end_s) /
+                         (tuning.approach_ttc_taper_start_s - tuning.approach_ttc_taper_end_s)))
 
 
 class LosNavigator:
@@ -221,11 +251,13 @@ class LosNavigator:
                 and self._bearing.count >= 2)
 
     def _track(self, now):
-        if self._reference is None:
+        first_track = self._reference is None
+        if first_track:
             self._reference = self._candidate_reference
         self._track_reference = (self.config.tuning.track_elevation_rad, self._reference[1])
         errors = tuple(wrap(a - b) for a, b in zip(self._bearing.at(now), self._track_reference))
-        self._control.begin_track(errors, self._bearing.rates)
+        entry_descent = self.config.tuning.los_entry_descent_m_s if first_track and errors[0] > 0 else 0.0
+        self._control.begin_track(errors, self._bearing.rates, entry_descent_m_s=entry_descent)
         self.state = State.TRACK
         self._reason = "tracking"
         self._limited_at = None
@@ -395,6 +427,9 @@ class LosNavigator:
 
         errors = None
         approach_scale = 0.0
+        min_descent_m_s = 0.0
+        bottom_edge_boost_m_s = 0.0
+        descent_speed_cap_m_s = None
         if self.state == State.TRACK:
             self._stage_and_feasibility(now, altitude, vz)
             previous = self._control.last_diagnostics
@@ -416,13 +451,26 @@ class LosNavigator:
                 self._reason = "tracking"
             if self.state == State.TRACK:
                 errors = tuple(wrap(a - b) for a, b in zip(self._bearing.at(now), self._track_reference))
+                if self._visual_usable:
+                    min_descent_m_s = tracking_descent_floor(errors[0], t)
+                    if errors[0] > 0 and self._processed_target is not None and self._processed_target.bbox is not None:
+                        margins, _ = box_edges(self._processed_target.bbox, self.config.camera)
+                        bottom_edge_boost_m_s = bottom_edge_descent_boost(
+                            margins[3], self.config.camera.height_px, t)
+                        min_descent_m_s += bottom_edge_boost_m_s
+                descent_speed_cap_m_s = braking_speed_cap(
+                    altitude, vz, self.config.target_altitude_m, t)
+                tau, _ = self._ttc.at(now)
+                approach_scale = min(approach_scale, ttc_pitch_scale(tau, t))
         elif self.state == State.RECOVER:
             errors = self._recovery_errors(now)
         try:
             command = self._control.step(dt, altitude, vz, attitude.orientation_xyzw, self._heading,
                                          errors=errors, rates=self._bearing.rates,
                                          hold_altitude=self._hold_altitude, approach_scale=approach_scale,
-                                         freeze_integral=over_tilt)
+                                         freeze_integral=over_tilt, min_descent_m_s=min_descent_m_s,
+                                         descent_speed_cap_m_s=descent_speed_cap_m_s,
+                                         bottom_edge_boost_m_s=bottom_edge_boost_m_s)
         except ArithmeticError:
             self._fault("control_numeric_failure")
             return self._result(now)

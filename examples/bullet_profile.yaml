@@ -30,7 +30,7 @@ vehicle:
 # MISSION TARGET
 # ********************
 # Target barometric altitude in m. Usage: set in the same datum as feedback.
-target_altitude_m: 0.0
+target_altitude_m: 1.0
 # Runtime uses radians; degree values below are converted during loading.
 tuning:
   # Lateral attitude and yaw limits.
@@ -38,7 +38,7 @@ tuning:
 # LATERAL ATTITUDE AND YAW
 # ********************
   # Forward approach pitch in degrees. Usage: increase carefully for faster closing.
-  approach_pitch_deg: 7
+  approach_pitch_deg: 5
   # Maximum roll command in degrees. Usage: cap lateral correction authority.
   roll_limit_deg: 15
   # Maximum pitch command in degrees. Usage: cap forward command authority.
@@ -48,7 +48,7 @@ tuning:
   # Roll-reference slew limit in degrees/s. Usage: lower for smoother lateral response.
   roll_slew_deg_s: 15
   # Pitch-reference slew limit in degrees/s. Usage: lower for smoother forward response.
-  pitch_slew_deg_s: 5
+  pitch_slew_deg_s: 10
   # Yaw hold proportional gain in 1/s. Usage: raise only until heading correction is prompt.
   yaw_gain_s_inv: 4.0
   # Maximum yaw rate in degrees/s. Usage: cap search and hold rotation.
@@ -65,8 +65,24 @@ tuning:
   max_descent_m_s: 3.0
   # Maximum upward speed in m/s. Usage: cap altitude recovery.
   max_climb_m_s: 3.0
+  # Initial downward-speed target in m/s when first LOS track sees the target below reference; 0 disables it.
+  los_entry_descent_m_s: 1.5
+  # Maximum tracking descent floor in m/s while a fresh target is below reference.
+  los_min_track_descent_m_s: 1.5
+  # Elevation error over which the tracking descent floor tapers to zero; 0 keeps a hard floor.
+  los_floor_taper_deg: 10
+  # Conservative downward braking rate in m/s²; 0 disables target-height speed capping.
+  los_brake_accel_m_s2: 1.0
+  # Delay allowance in s, multiplied by measured downward speed before braking-speed calculation.
+  los_brake_delay_s: 0.8
+  # Add downward request while a fully visible target nears the bottom 20% of the image.
+  los_bottom_guard_fraction: 0.2
+  los_bottom_boost_m_s: 2.0
+  # Qualified TTC interval in s over which forward pitch tapers to zero; both zero disables it.
+  approach_ttc_taper_start_s: 6.0
+  approach_ttc_taper_end_s: 2.0
   # Vertical-speed reference slew in m/s². Usage: lower for gentler thrust changes.
-  vertical_slew_m_s2: 1.0
+  vertical_slew_m_s2: 2.0
   # Vertical braking slew in m/s². Usage: raise to arrest excessive downward velocity faster.
   vertical_brake_slew_m_s2: 4.0
   # Takeoff altitude proportional gain in 1/s. Usage: legacy takeoff response.
@@ -187,6 +203,6 @@ tuning:
 # CLOSE-TARGET COMMIT
 # ********************
   # Frame coverage fraction for commit. Usage: enter command hold when a close target reaches an edge.
-  commit_coverage_fraction: 0.4
+  commit_coverage_fraction: 0.25
   # Edge proximity margin in pixels. Usage: increase to commit before literal edge contact.
   commit_edge_margin_px: 0.0

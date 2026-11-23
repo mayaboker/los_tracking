@@ -38,11 +38,12 @@ class LosControl:
         self.thrust_integral = 0.0
         self.last_diagnostics = {}
 
-    def begin_track(self, errors, rates):
-        """Reseed biases for continuity without changing the saved LOS."""
+    def begin_track(self, errors, rates, *, entry_descent_m_s=0.0):
+        """Reseed tracking biases, optionally starting a bounded first descent."""
         t = self.tuning
         self.vertical_memory = self.lateral_memory = 0.0
-        self.vertical_bias = self.vz_reference + t.elevation_kp_m_s_rad * errors[0] + t.elevation_kd_m_rad * rates[0]
+        self.vertical_bias = (self.vz_reference - entry_descent_m_s
+                              + t.elevation_kp_m_s_rad * errors[0] + t.elevation_kd_m_rad * rates[0])
         self.roll_bias = self.angles[0] + t.azimuth_kp * errors[1] + t.azimuth_kd_s * rates[1]
 
     def recover(self):
@@ -50,7 +51,8 @@ class LosControl:
 
     def step(self, dt, altitude, vz, attitude, heading, *, errors=None, rates=(0.0, 0.0),
              hold_altitude=None, approach_scale=1.0, freeze_integral=False, max_climb_m_s=None,
-             vertical_reference_m_s=None, yaw_rate_rad_s=None):
+             vertical_reference_m_s=None, yaw_rate_rad_s=None, min_descent_m_s=0.0,
+             descent_speed_cap_m_s=None, bottom_edge_boost_m_s=0.0):
         t, vehicle = self.tuning, self.config.vehicle
         if yaw_rate_rad_s is not None:
             finite(yaw_rate_rad_s, 'yaw_rate_rad_s')
@@ -75,7 +77,21 @@ class LosControl:
             base_z = t.hold_altitude_gain_s_inv * (hold_altitude - altitude)
             base_r = 0.0
 
-        requested_z = vertical_reference_m_s if vertical_reference_m_s is not None else base_z + (candidate_z if tracking else 0.0)
+        floor = min_descent_m_s if tracking and vertical_reference_m_s is None else 0.0
+
+        def shaped_request(memory):
+            request = (vertical_reference_m_s if vertical_reference_m_s is not None
+                       else base_z + (memory if tracking else 0.0))
+            if floor > 0:
+                request = min(request, -floor)
+            if tracking and descent_speed_cap_m_s is not None:
+                request = max(request, -descent_speed_cap_m_s)
+            return request
+
+        if (tracking and descent_speed_cap_m_s is not None and candidate_z < old_z
+                and min(base_z + candidate_z, -floor) < -descent_speed_cap_m_s):
+            candidate_z = old_z
+        requested_z = shaped_request(candidate_z)
         limited_z = clamp(requested_z, -t.max_descent_m_s, t.max_climb_m_s if max_climb_m_s is None else max_climb_m_s)
         if vertical_reference_m_s is not None:
             new_z = limited_z
@@ -86,7 +102,7 @@ class LosControl:
                                             -t.vertical_slew_m_s2 * dt, vertical_slew * dt)
         if vertical_reference_m_s is None and tracking and (candidate_z - old_z) * (requested_z - new_z) > 0:
             candidate_z = old_z
-            requested_z = base_z + candidate_z
+            requested_z = shaped_request(candidate_z)
             limited_z = clamp(requested_z, -t.max_descent_m_s, t.max_climb_m_s if max_climb_m_s is None else max_climb_m_s)
             vertical_slew = (t.vertical_brake_slew_m_s2
                              if limited_z > self.vz_reference else t.vertical_slew_m_s2)
@@ -137,6 +153,9 @@ class LosControl:
         self.angles, self.vz_reference = new_angles, new_z
         self.last_diagnostics = dict(
             requested_vertical_speed_m_s=requested_z, vertical_reference_m_s=new_z,
+            descent_floor_m_s=floor, descent_speed_cap_m_s=descent_speed_cap_m_s,
+            bottom_edge_boost_m_s=bottom_edge_boost_m_s,
+            approach_pitch_scale=approach_scale if tracking else 0.0,
             requested_roll_rad=requested_roll, reference_roll_rad=new_angles[0], reference_pitch_rad=new_angles[1],
             output_roll_rad=output_angles[0], output_pitch_rad=output_angles[1],
             requested_tilt_rad=combined_tilt(requested_roll, requested_pitch),
