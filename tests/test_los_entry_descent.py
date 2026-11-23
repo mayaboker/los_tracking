@@ -1,12 +1,15 @@
 """First-track descent starts promptly without changing recovery handoff."""
 
 from dataclasses import replace
+from math import radians, sqrt
 
 import pytest
 
 from los_tracking import LosNavigator, State
 from los_tracking.config import Tuning
 from los_tracking.control import LosControl
+from los_tracking.navigator import (bottom_edge_descent_boost, braking_speed_cap,
+                                    tracking_descent_floor, ttc_pitch_scale)
 
 from conftest import IDENTITY, samples
 
@@ -18,6 +21,60 @@ def test_entry_descent_is_bounded_by_max_descent():
         Tuning(los_entry_descent_m_s=6.)
     with pytest.raises(ValueError, match='LOS minimum tracking descent'):
         Tuning(los_min_track_descent_m_s=6.)
+    with pytest.raises(ValueError, match='TTC pitch taper'):
+        Tuning(approach_ttc_taper_start_s=1., approach_ttc_taper_end_s=2.)
+    with pytest.raises(ValueError, match='bottom guard'):
+        Tuning(los_bottom_guard_fraction=1.)
+    with pytest.raises(ValueError, match='bottom boost'):
+        Tuning(los_min_track_descent_m_s=4., los_bottom_boost_m_s=2.)
+
+
+def test_profile_floor_tapers_and_entry_request_is_preserved():
+    from pathlib import Path
+    from los_tracking import NavigatorConfig
+
+    profile = NavigatorConfig.from_yaml(Path(__file__).parents[1] / 'examples/bullet_profile.yaml')
+    tuning = profile.tuning
+    assert tracking_descent_floor(radians(12), tuning) == pytest.approx(1.5)
+    assert tracking_descent_floor(radians(5), tuning) == pytest.approx(.75)
+    assert tracking_descent_floor(0, tuning) == 0
+    assert bottom_edge_descent_boost(120., 480, tuning) == 0
+    assert bottom_edge_descent_boost(48., 480, tuning) == pytest.approx(1.)
+    assert bottom_edge_descent_boost(0., 480, tuning) == 2.
+    nav = LosNavigator(profile)
+    result = _first_track(nav, bbox=(310., 280., 20., 20.))
+    assert result.diagnostics.requested_vertical_speed_m_s == pytest.approx(-1.5, abs=.1)
+    assert result.diagnostics.descent_floor_m_s <= 1.5
+
+
+def test_measured_speed_and_height_brake_before_target(config):
+    tuning = replace(config.tuning, los_brake_accel_m_s2=1.5, los_brake_delay_s=.3,
+                     elevation_kp_m_s_rad=0., elevation_kd_m_rad=0., elevation_ki_m_s2_rad=1.)
+    assert braking_speed_cap(30., -2.5, 1., tuning) == tuning.max_descent_m_s
+    assert braking_speed_cap(4., -2.5, 1., tuning) == pytest.approx(sqrt(2 * 1.5 * 2.25))
+    assert braking_speed_cap(1., -2.5, 1., tuning) == 0.
+    control = LosControl(replace(config, tuning=tuning))
+    control.vertical_bias = -2.
+    control.step(.1, 4., -2.5, IDENTITY, 0., errors=(.1, 0.),
+                 min_descent_m_s=1.5, descent_speed_cap_m_s=.5)
+    assert control.last_diagnostics['requested_vertical_speed_m_s'] == -.5
+    assert control.vertical_memory == 0.
+    assert not control.last_diagnostics['vertical_limited']
+
+
+def test_qualified_ttc_pitch_tapers_but_missing_ttc_does_not(config, monkeypatch):
+    tuning = replace(config.tuning, approach_ttc_taper_start_s=4., approach_ttc_taper_end_s=1.)
+    assert ttc_pitch_scale(None, tuning) == 1.
+    assert ttc_pitch_scale(4., tuning) == 1.
+    assert ttc_pitch_scale(2.5, tuning) == .5
+    assert ttc_pitch_scale(1., tuning) == 0.
+    nav = LosNavigator(replace(config, tuning=tuning, target_altitude_m=10.))
+    _first_track(nav, bbox=(310., 280., 20., 20.))
+    monkeypatch.setattr(nav._ttc, 'at', lambda now: (2.5, 'qualified'))
+    index = round(nav._last_now * 100) + 1
+    result = nav.update(samples(index, bbox=(310., 280., 20., 20.)), now_s=index / 100, enabled=True)
+    assert result.diagnostics.approach_pitch_scale == .5
+    assert result.diagnostics.reference_pitch_rad <= tuning.approach_pitch_rad * .5
 
 
 def test_tracking_descent_floor_is_bounded_and_optional(config):

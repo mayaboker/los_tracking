@@ -65,7 +65,7 @@ centre.
 | `mass_kg` | Bullet: 1 kg | Vehicle mass; `> 0`. Must satisfy `max_thrust_n > mass × gravity`. | Higher configured mass raises gravity-compensation thrust. It must match the vehicle. |
 | `max_thrust_n` | Bullet: 33.953391 N | Maximum collective thrust; greater than level hover thrust. | Higher permits more collective demand. It must match the vehicle. |
 | `gravity_m_s2` | 9.81 m/s² | Gravity used in hover compensation; `> 0`. | Higher value raises calculated hover thrust. Match the physical/simulated environment. |
-| `target_altitude_m` | Bullet: 0 m | Target altitude used by **descent-feasibility supervision**. Any finite value; same altitude datum as the barometer. | Raising it reduces the descent considered necessary, making feasibility easier. Lowering it makes feasibility harder. **It does not directly command a descent or landing.** |
+| `target_altitude_m` | Bullet: 1 m | Target altitude used by descent-feasibility supervision and, when enabled, the tracking descent speed cap. Any finite value in the barometer's datum. | Raising it starts tracking descent braking earlier. It does not declare contact or landing. |
 
 ## 3. Approach, angle and speed limits
 
@@ -79,6 +79,13 @@ centre.
 | `pitch_slew_rad_s` | 5°/s | Maximum pitch-reference change rate; `> 0`. | Higher starts/stops the approach faster; lower makes transitions slower, including recovery. |
 | `max_descent_m_s` | 5.5 m/s | Maximum downward speed reference; `> 0`. Also used in feasibility prediction. | Higher permits faster descent and makes predicted descent easier to achieve. Lower can cause earlier approach reduction. |
 | `max_climb_m_s` | 3 m/s | Maximum upward speed reference; `> 0`. | Higher permits stronger climb correction. Lower clips upward demand sooner. The app's preceding hold separately caps climb at 1 m/s. |
+| `los_entry_descent_m_s` | 0 m/s; Bullet: 1.5 m/s | First-track descent request when the target is below the elevation reference; nonnegative and at most maximum descent. | Higher starts the downward reference faster. |
+| `los_min_track_descent_m_s` | 0 m/s; Bullet: 1.5 m/s | Maximum tracking descent floor while a fresh target remains below reference; nonnegative and at most maximum descent. | Higher requests faster descent where the floor is active. |
+| `los_floor_taper_rad` | 0°; Bullet: 10° | Positive elevation-error range over which the descent floor rises linearly from zero to its maximum. Zero keeps the existing hard floor. | Higher spreads the taper over more of the approach. |
+| `los_brake_accel_m_s2` | 0; Bullet: 1.0 m/s² | Enables a target-height cap on requested downward speed using a conservative braking rate; zero disables it. | Higher permits faster descent nearer target height. |
+| `los_brake_delay_s` | 0; Bullet: 0.8 s | Subtracts measured downward speed times this delay from available braking height. | Higher starts descent braking earlier. |
+| `los_bottom_guard_fraction` | 0; Bullet: 0.2 | Fraction of image height near the bottom edge where a fully visible, below-reference target begins to add downward request; `0 ≤ value < 1`. Zero disables it. | Higher starts the response earlier. |
+| `los_bottom_boost_m_s` | 0; Bullet: 2.0 m/s | Maximum extra downward request at the lower edge; combined with the tracking floor it must not exceed maximum descent. The height-based speed cap still applies. | Higher moves the target upward in the image faster, subject to the cap. |
 | `vertical_slew_m_s2` | 1 m/s² | Maximum vertical-speed-reference change rate; `> 0`. Also models descent acceleration for feasibility. | Higher responds faster and predicts more descent capability. Lower smooths changes but makes descent feasibility harder. |
 
 The combined-tilt limit is applied geometrically: available pitch decreases as
@@ -206,7 +213,9 @@ driving target pixels to image centre.
 | `ttc_dwell_s` | 0.3 s | Qualification dwell for entering TTC stage; `> 0`. | Higher delays stage entry; lower responds faster. Terminal entry bypasses this dwell. |
 | `terminal_ttc_s` | 0.8 s | Immediate terminal-stage threshold; positive and below entry threshold. | Higher latches terminal earlier; lower later. This does not signal collision or stop commands. |
 | `ttc_time_margin_s` | 0.1 s | Subtracted from TTC before calculating available descent time; `≥ 0`. | Higher makes feasibility more conservative, causing earlier slowing/recovery. Lower assumes more time remains. |
+| `approach_ttc_taper_start_s` / `approach_ttc_taper_end_s` | 0 / 0; Bullet: 6 / 2 s | Qualified TTC interval over which forward pitch falls linearly to zero. Both zero disable the taper; otherwise start must exceed end and both must be positive. | Higher values slow forward motion earlier. Missing TTC leaves this scale at one. |
 | `feasibility_height_margin_m` | 0.25 m | Added to predicted available descent; `≥ 0`. | **Higher makes feasibility more permissive**, allowing a larger predicted descent shortfall. Lower makes it stricter. |
+| `commit_coverage_fraction` | 0.4; Bullet: 0.25 | Minimum frame-area coverage for edge-triggered close-target command hold; `0 < value ≤ 1`. | Lower permits commit with a smaller target and more remaining distance. |
 
 TTC fits reciprocal apparent size rather than directly fitting width or height:
 

@@ -38,7 +38,7 @@ tuning:
 # LATERAL ATTITUDE AND YAW
 # ********************
   # Forward approach pitch in degrees. Usage: increase carefully for faster closing.
-  approach_pitch_deg: 10
+  approach_pitch_deg: 5
   # Maximum roll command in degrees. Usage: cap lateral correction authority.
   roll_limit_deg: 15
   # Maximum pitch command in degrees. Usage: cap forward command authority.
@@ -67,8 +67,20 @@ tuning:
   max_climb_m_s: 3.0
   # Initial downward-speed target in m/s when first LOS track sees the target below reference; 0 disables it.
   los_entry_descent_m_s: 1.5
-  # Minimum downward-speed request in m/s while a fresh tracked target remains below reference; 0 disables it.
-  los_min_track_descent_m_s: 2.5
+  # Maximum tracking descent floor in m/s while a fresh target is below reference.
+  los_min_track_descent_m_s: 1.5
+  # Elevation error over which the tracking descent floor tapers to zero; 0 keeps a hard floor.
+  los_floor_taper_deg: 10
+  # Conservative downward braking rate in m/s²; 0 disables target-height speed capping.
+  los_brake_accel_m_s2: 1.0
+  # Delay allowance in s, multiplied by measured downward speed before braking-speed calculation.
+  los_brake_delay_s: 0.8
+  # Add downward request while a fully visible target nears the bottom 20% of the image.
+  los_bottom_guard_fraction: 0.2
+  los_bottom_boost_m_s: 2.0
+  # Qualified TTC interval in s over which forward pitch tapers to zero; both zero disables it.
+  approach_ttc_taper_start_s: 6.0
+  approach_ttc_taper_end_s: 2.0
   # Vertical-speed reference slew in m/s². Usage: lower for gentler thrust changes.
   vertical_slew_m_s2: 2.0
   # Vertical braking slew in m/s². Usage: raise to arrest excessive downward velocity faster.
@@ -191,6 +203,6 @@ tuning:
 # CLOSE-TARGET COMMIT
 # ********************
   # Frame coverage fraction for commit. Usage: enter command hold when a close target reaches an edge.
-  commit_coverage_fraction: 0.4
+  commit_coverage_fraction: 0.25
   # Edge proximity margin in pixels. Usage: increase to commit before literal edge contact.
   commit_edge_margin_px: 0.0

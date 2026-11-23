@@ -161,12 +161,17 @@ control:
 
 Library defaults start at 7° approach pitch, 15° roll and 30° total tilt; roll/pitch slew
 15°/s and 5°/s; climb/descent bounds 3/5.5 m/s; vertical-reference slew 1 m/s².
-The bundled Bullet profile requests 10° approach pitch, 10°/s pitch slew, 2 m/s²
+The bundled Bullet profile requests 5° approach pitch, 10°/s pitch slew, 2 m/s²
 downward-reference slew, and a 1.5 m/s descent on first LOS acquisition when the
-target is below the tracking reference. While a fresh tracked target remains below
-the elevation reference, the Bullet profile requests at least 2.5 m/s downward;
-faster descent remains available and recovery releases this floor. Other profiles
-default to no entry descent or tracking floor. The Bullet profile permits 20° total
+target is below the tracking reference. The Bullet profile's tracking descent floor
+is at most 1.5 m/s and tapers to zero over the last 10° of positive elevation error.
+A fully visible target entering the bottom 20% of the image adds up to 2.0 m/s
+to that request, subject to the target-height speed cap. At the image edge, the
+Bullet profile commits only after the target covers at least 25% of the frame.
+A target-height speed cap uses 1.0 m/s² braking and 0.8 s of delay allowance;
+qualified TTC tapers forward pitch from 6 s to 2 s before contact. Other profiles
+default to no entry descent, tracking floor, edge boost, target-height cap or TTC pitch taper.
+The Bullet profile permits 20° total
 deviation from the acquired LOS while retaining a 12° frame-to-frame jump limit.
 Upstream vertical LOS gains expressed per degree are converted to radians.
 Camera age is limited to 0.1 s, attitude 0.05 s, barometer 0.2 s, control gaps 0.1 s,
