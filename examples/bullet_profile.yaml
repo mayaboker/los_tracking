@@ -62,7 +62,7 @@ tuning:
 # VERTICAL MOTION AND CONTROL
 # ********************
   # Maximum downward speed in m/s. Usage: cap closing descent.
-  max_descent_m_s: 5.5
+  max_descent_m_s: 3.0
   # Maximum upward speed in m/s. Usage: cap altitude recovery.
   max_climb_m_s: 3.0
   # Vertical-speed reference slew in m/s². Usage: lower for gentler thrust changes.
@@ -120,15 +120,15 @@ tuning:
   # Maximum accepted image age in s. Usage: keep below control responsiveness needs.
   max_image_age_s: 0.2
   # Maximum accepted attitude age in s. Usage: match attitude publication latency.
-  max_attitude_age_s: 0.2
+  max_attitude_age_s: 0.5
   # Maximum accepted barometer age in s. Usage: match altitude publication latency.
   max_barometer_age_s: 0.2
   # Attitude history duration in s. Usage: cover the maximum image age.
   attitude_history_s: 0.5
   # Maximum image-to-attitude alignment gap in s. Usage: reject poorly synchronized frames.
-  max_alignment_gap_s: 0.12
+  max_alignment_gap_s: 0.3
   # Maximum control-loop gap in s. Usage: fault when control timing stalls.
-  max_control_gap_s: 0.1
+  max_control_gap_s: 0.3
   # Command validity horizon in s. Usage: cover transport and scheduling delay.
   command_validity_s: 0.05
   # Acquisition, recovery, and bounded visual association.
@@ -142,9 +142,9 @@ tuning:
   # Stable-observation dwell before reacquiring in s. Usage: raise to reject transient recovery.
   recovery_dwell_s: 0.1
   # Maximum recovery time in s. Usage: fault if visual recovery does not complete.
-  recovery_timeout_s: 1.0
+  recovery_timeout_s: 2.0
   # Sustained control-limit duration in s. Usage: recover before pushing an infeasible approach.
-  limitation_timeout_s: 0.75
+  limitation_timeout_s: 1.5
 # ********************
 # VISUAL ACCEPTANCE LIMITS
 # ********************
@@ -153,7 +153,7 @@ tuning:
   # Maximum target azimuth from optical axis in degrees. Usage: reject implausible detections.
   max_azimuth_deg: 35
   # Maximum deviation from acquired LOS in degrees. Usage: prevent target swaps.
-  max_los_deviation_deg: 12
+  max_los_deviation_deg: 20
   # Maximum frame-to-frame bearing jump in degrees. Usage: reject association jumps.
   max_association_jump_deg: 12
   # Time-to-contact qualification.
