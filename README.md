@@ -138,6 +138,10 @@ commands with an independent receiver watchdog. This library opens no transport.
 ## Configuration and starting profile
 
 `examples/bullet_profile.yaml` contains every tuning value for reproducibility.
+`examples/isaac_profile.yaml` carries Alice's Isaac SITL limits separately: a
+3 m/s descent cap with a 1.5 m/s bottom-edge boost, wider attitude/alignment/control timing windows, and longer
+recovery and limitation timeouts. Select it explicitly for Isaac runs; the Bullet
+profile retains the values validated in the PyBullet target-hit run.
 Platform fields are explicit: intrinsics and mount, mass, maximum thrust,
 and target altitude in the same barometric datum. Barometric altitude is not AGL.
 The profile uses a 1 kg vehicle and 33.953391 N maximum thrust from the bundled
