@@ -164,9 +164,10 @@ Library defaults start at 7° approach pitch, 15° roll and 30° total tilt; rol
 The bundled Bullet profile requests 10° approach pitch, 10°/s pitch slew, 2 m/s²
 downward-reference slew, and a 1.5 m/s descent on first LOS acquisition when the
 target is below the tracking reference. While a fresh tracked target remains below
-the elevation reference, the Bullet profile requests at least 1.0 m/s downward;
+the elevation reference, the Bullet profile requests at least 2.5 m/s downward;
 faster descent remains available and recovery releases this floor. Other profiles
-default to no entry descent or tracking floor.
+default to no entry descent or tracking floor. The Bullet profile permits 20° total
+deviation from the acquired LOS while retaining a 12° frame-to-frame jump limit.
 Upstream vertical LOS gains expressed per degree are converted to radians.
 Camera age is limited to 0.1 s, attitude 0.05 s, barometer 0.2 s, control gaps 0.1 s,
 and command validity 0.05 s. The bundled Bullet profile raises attitude age to

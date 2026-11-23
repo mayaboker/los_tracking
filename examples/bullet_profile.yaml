@@ -68,7 +68,7 @@ tuning:
   # Initial downward-speed target in m/s when first LOS track sees the target below reference; 0 disables it.
   los_entry_descent_m_s: 1.5
   # Minimum downward-speed request in m/s while a fresh tracked target remains below reference; 0 disables it.
-  los_min_track_descent_m_s: 1.0
+  los_min_track_descent_m_s: 2.5
   # Vertical-speed reference slew in m/s². Usage: lower for gentler thrust changes.
   vertical_slew_m_s2: 2.0
   # Vertical braking slew in m/s². Usage: raise to arrest excessive downward velocity faster.
@@ -157,7 +157,7 @@ tuning:
   # Maximum target azimuth from optical axis in degrees. Usage: reject implausible detections.
   max_azimuth_deg: 35
   # Maximum deviation from acquired LOS in degrees. Usage: prevent target swaps.
-  max_los_deviation_deg: 12
+  max_los_deviation_deg: 20
   # Maximum frame-to-frame bearing jump in degrees. Usage: reject association jumps.
   max_association_jump_deg: 12
   # Time-to-contact qualification.
