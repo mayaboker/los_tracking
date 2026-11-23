@@ -221,11 +221,13 @@ class LosNavigator:
                 and self._bearing.count >= 2)
 
     def _track(self, now):
-        if self._reference is None:
+        first_track = self._reference is None
+        if first_track:
             self._reference = self._candidate_reference
         self._track_reference = (self.config.tuning.track_elevation_rad, self._reference[1])
         errors = tuple(wrap(a - b) for a, b in zip(self._bearing.at(now), self._track_reference))
-        self._control.begin_track(errors, self._bearing.rates)
+        entry_descent = self.config.tuning.los_entry_descent_m_s if first_track and errors[0] > 0 else 0.0
+        self._control.begin_track(errors, self._bearing.rates, entry_descent_m_s=entry_descent)
         self.state = State.TRACK
         self._reason = "tracking"
         self._limited_at = None
@@ -395,6 +397,7 @@ class LosNavigator:
 
         errors = None
         approach_scale = 0.0
+        min_descent_m_s = 0.0
         if self.state == State.TRACK:
             self._stage_and_feasibility(now, altitude, vz)
             previous = self._control.last_diagnostics
@@ -416,13 +419,15 @@ class LosNavigator:
                 self._reason = "tracking"
             if self.state == State.TRACK:
                 errors = tuple(wrap(a - b) for a, b in zip(self._bearing.at(now), self._track_reference))
+                if self._visual_usable and errors[0] > 0:
+                    min_descent_m_s = t.los_min_track_descent_m_s
         elif self.state == State.RECOVER:
             errors = self._recovery_errors(now)
         try:
             command = self._control.step(dt, altitude, vz, attitude.orientation_xyzw, self._heading,
                                          errors=errors, rates=self._bearing.rates,
                                          hold_altitude=self._hold_altitude, approach_scale=approach_scale,
-                                         freeze_integral=over_tilt)
+                                         freeze_integral=over_tilt, min_descent_m_s=min_descent_m_s)
         except ArithmeticError:
             self._fault("control_numeric_failure")
             return self._result(now)

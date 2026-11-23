@@ -145,6 +145,8 @@ class Tuning:
     track_elevation_rad: float = 0.0
     max_descent_m_s: float = 5.5
     max_climb_m_s: float = 3.0
+    los_entry_descent_m_s: float = 0.0
+    los_min_track_descent_m_s: float = 0.0
     vertical_slew_m_s2: float = 1.0
     vertical_brake_slew_m_s2: float = 4.0
     takeoff_kp_s_inv: float = 1.0
@@ -206,6 +208,7 @@ class Tuning:
                        "vertical_ki_n_m", "yaw_gain_s_inv", "ttc_time_margin_s",
                        "feasibility_height_margin_m", "commit_edge_margin_px",
                        "track_elevation_rad",
+                       "los_entry_descent_m_s", "los_min_track_descent_m_s",
                        "takeoff_kp_s_inv", "takeoff_ki_s2_inv",
                        "betaflight_takeoff_pwm", "betaflight_hover_pwm"}
         for item in fields(self):
@@ -220,6 +223,10 @@ class Tuning:
             raise ValueError("approach pitch exceeds an angular limit")
         if self.takeoff_max_climb_m_s > self.max_climb_m_s:
             raise ValueError("takeoff climb exceeds maximum climb")
+        if self.los_entry_descent_m_s > self.max_descent_m_s:
+            raise ValueError("LOS entry descent exceeds maximum descent")
+        if self.los_min_track_descent_m_s > self.max_descent_m_s:
+            raise ValueError("LOS minimum tracking descent exceeds maximum descent")
         if not 0 < self.barometer_alpha <= 1 or not 0 < self.barometer_beta <= 1:
             raise ValueError("barometer filter gains must lie in (0,1]")
         if not 0 < self.commit_coverage_fraction <= 1:
