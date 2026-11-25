@@ -203,6 +203,6 @@ tuning:
 # CLOSE-TARGET COMMIT
 # ********************
   # Frame coverage fraction for commit. Usage: enter command hold when a close target reaches an edge.
-  commit_coverage_fraction: 0.25
+  commit_coverage_fraction: 0.02
   # Edge proximity margin in pixels. Usage: increase to commit before literal edge contact.
   commit_edge_margin_px: 0.0
