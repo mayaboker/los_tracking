@@ -274,8 +274,10 @@ class LosNavigator:
 
     def _commit_eligible(self, now):
         sample = self._pending_target
+        if self.state == State.RECOVER and self._reason == "clipped_target":
+            sample = self._processed_target
         if (self.state not in (State.TRACK, State.RECOVER)
-                or self.state == State.RECOVER and self._reason != "persistent_limitation"
+                or self.state == State.RECOVER and self._reason not in ("persistent_limitation", "clipped_target")
                 or self._commit_command is None or sample is None or sample.bbox is None):
             return False
         if now - sample.timestamp_s > self.config.tuning.max_image_age_s + TIME_EPSILON:
