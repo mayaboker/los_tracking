@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "los-tracking"
-version = "0.2.0"
+version = "0.25.0"
 description = "Timestamped bbox, altitude and attitude to bounded Angle-mode RC guidance"
 readme = "README.md"
 requires-python = ">=3.12"
